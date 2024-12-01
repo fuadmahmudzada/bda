@@ -7,15 +7,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import org.yalli.wah.dao.entity.UserEntity;
 import org.yalli.wah.model.dto.*;
-import org.yalli.wah.model.dto.ConfirmDto;
-import org.yalli.wah.model.dto.LoginDto;
-import org.yalli.wah.model.dto.PasswordResetDto;
-import org.yalli.wah.model.dto.RegisterDto;
+import org.yalli.wah.model.enums.Country;
 import org.yalli.wah.service.UserService;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/v1/users")
@@ -29,6 +28,16 @@ public class UserController {
     public HashMap<String, String> login(@RequestBody LoginDto loginDto) {
         return userService.login(loginDto);
     }
+
+    @GetMapping("/countries")
+    @Operation(summary = "get all countries")
+    @ResponseStatus(HttpStatus.OK)
+    public List<String> getCountries() {
+        return Arrays.stream(Country.values())
+                .map(Country::getCountryName)
+                .collect(Collectors.toList());
+    }
+
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -85,18 +94,33 @@ public class UserController {
 
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public MemberInfoDto getUser(@PathVariable Long id){
+    public MemberInfoDto getUser(@PathVariable Long id) {
         return userService.getUserById(id);
     }
 
     @PatchMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public void updateUser(@RequestBody MemberInfoDto memberInfoDto){
-         userService.updateUser(memberInfoDto);
+    public void updateUser(@RequestBody MemberUpdateDto memberUpdateDto, @PathVariable Long id) {
+        userService.updateUser(memberUpdateDto, id);
     }
-  
+
     @GetMapping("/send-otp")
     public void sendOtp(String email) {
         userService.sendOtp(email);
     }
+
+    @DeleteMapping("/delete/{id}")
+    @Operation(summary = "Delete user")
+    @ResponseStatus(HttpStatus.OK)
+    public void deleteUser(@PathVariable Long id){
+        userService.deleteUser(id);
+    }
+
+    @PostMapping("/register/resend-otp")
+    @Operation(summary = "send otp for registering again")
+    @ResponseStatus(HttpStatus.OK)
+    public void resendOtp(@RequestBody SendOtpDto sendOtpDto){
+        userService.resendRegisterOtp(sendOtpDto.getEmail());
+    }
+
 }

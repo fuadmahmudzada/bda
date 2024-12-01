@@ -10,12 +10,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 import org.yalli.wah.model.enums.SocialMedia;
 
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Entity
 @Table(name = "users")
@@ -39,23 +37,30 @@ public class UserEntity {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
     private String profilePictureUrl;
-    @ManyToMany
+    @ManyToMany(cascade = CascadeType.ALL)
     @JoinTable(
             name = "user_saved_events",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "event_id")
     )
     private List<EventEntity> savedEvents;
-
-    @OneToMany(mappedBy = "user")
-    private List<CommentEntity> comments;
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "account_urls")
-    private Map<SocialMedia, String> socialMediaAccounts = new HashMap<>();
+    private HashMap<SocialMedia, String> socialMediaAccounts;
     private String otp;
     private LocalDateTime otpExpiration;
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean otpVerified;
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean emailConfirmed = false;
+    @Column(name = "number_of_not_completed_fields")
+    private Integer notCompletedFields = 0;
+    @ManyToMany(cascade = CascadeType.ALL)
+    @JoinTable(name = "user_notifications",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "notifications_id")
+    )
+    private List<NotificationEntity> notifications;
+    @OneToMany(mappedBy = "userEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GroupEntity> groups;
 }

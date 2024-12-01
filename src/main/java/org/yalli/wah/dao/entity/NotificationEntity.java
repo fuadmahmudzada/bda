@@ -5,25 +5,24 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
-@Table(name = "comments")
+@Table(name = "notifications")
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class CommentEntity {
+@AllArgsConstructor
+public class NotificationEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String content;
-    private Integer rate;
-    private String userName;
-    @ManyToOne
-    @JoinColumn(name = "mentors_id")
-    private MentorEntity mentor;
+    private String detail;
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private LocalDateTime sentTime;
+    @ManyToMany(mappedBy="notifications")
+    private List<UserEntity> users;
+    private Boolean forAllUsers=false;
 }

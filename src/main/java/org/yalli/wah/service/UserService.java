@@ -9,6 +9,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.yalli.wah.dao.entity.UserEntity;
 import org.yalli.wah.dao.repository.UserRepository;
+import org.yalli.wah.mapper.ProfileMapper;
 import org.yalli.wah.mapper.UserMapper;
 import org.yalli.wah.model.dto.*;
 import org.yalli.wah.model.exception.InvalidInputException;
@@ -19,10 +20,17 @@ import org.yalli.wah.util.PasswordUtil;
 import org.yalli.wah.util.TokenUtil;
 import org.yalli.wah.util.UserSpecification;
 
+import javax.swing.*;
 import java.time.LocalDateTime;
+
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
+
+import java.util.*;
+
+
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +56,15 @@ public class UserService {
             log.info("ActionLog.login.error email {} not confirmed", loginDto.getEmail());
             throw new InvalidInputException("EMAIL_NOT_CONFIRMED");
         }
+        userEntity.setNotCompletedFields(0);
+        MemberUpdateDto memberUpdateDto = ProfileMapper.INSTANCE.toMemberUpdateDto(userEntity);
+        String[] fields = memberUpdateDto.toString().split(",");
+        for (String field : fields) {
+            if (field.contains("null")) {
+                userEntity.setNotCompletedFields(userEntity.getNotCompletedFields() + 1);
+            }
+        }
+        System.out.println(Arrays.toString(fields));
 
         userRepository.save(userEntity);
         log.info("ActionLog.login.end email {}", loginDto.getEmail());
@@ -69,13 +86,16 @@ public class UserService {
         userRepository.save(userEntity);
         log.info("ActionLog.sendOtp.end email {}", email);
     }
-  
+
     public void register(RegisterDto registerDto) {
         log.info("ActionLog.register.start email {}", registerDto.getEmail());
         userRepository.findByEmail(registerDto.getEmail()).ifPresent((user) -> {
-            throw new InvalidInputException("EMAIL_ALREADY_EXISTS");
+            if (user.isEmailConfirmed()) {
+                throw new InvalidInputException("EMAIL_ALREADY_EXISTS");
+            }
         });
-        UserEntity userEntity = UserMapper.INSTANCE.mapRegisterDtoToUser(registerDto);
+        UserEntity userEntity = userRepository.findByEmail(registerDto.getEmail()).orElse(new UserEntity());
+        userEntity = UserMapper.INSTANCE.mapRegisterDtoToUser(registerDto, userEntity);
         userEntity.setPassword(passwordUtil.encode(userEntity.getPassword()));
 
 
@@ -204,8 +224,9 @@ public class UserService {
 
     public Page<MemberDto> searchUsers(String fullName, String country, Pageable pageable) {
         log.info("ActionLog.searchUsers.start fullName {}, country {}", fullName, country);
-        Specification<UserEntity> spec = Specification.where(UserSpecification.hasFullName(fullName))
-                .and(UserSpecification.hasCountry(country));
+        Specification<UserEntity> spec = Specification.where(UserSpecification.isEmailConfirmed())
+                .and(UserSpecification.hasCountry(country))
+                .and(UserSpecification.hasFullName(fullName));
 
         Page<UserEntity> userEntities = userRepository.findAll(spec, pageable);
         log.info("ActionLog.searchUsers.end fullName {}, country {}", fullName, country);
@@ -221,26 +242,31 @@ public class UserService {
         }));
     }
 
-    public void updateUser(MemberInfoDto memberInfoDto) {
-
-        String oldEmail = getUserById(memberInfoDto.getId()).getEmail();
-        UserEntity userEntity = UserMapper.INSTANCE.updateMember(userRepository.findById(memberInfoDto.getId()).orElseThrow(()->
+    public void updateUser(MemberUpdateDto memberUpdateDto, Long id) {
+        var user = userRepository.findById(id).orElseThrow(() ->
         {
-            log.error("ActionLog.findById.error user not found with id {}", memberInfoDto.getId());
-            return new ResourceNotFoundException("MEMBER_NOT_FOUND");
-        }), memberInfoDto);
-
-
-        String newEmail = memberInfoDto.getEmail();
-        if (!Objects.equals(oldEmail, newEmail)) {
-            String otp = generateOtp();
-            userEntity.setOtp(otp);
-            userEntity.setOtpExpiration(LocalDateTime.now().plusSeconds(60));
-            userEntity.setEmailConfirmed(false);
-            emailService.sendConfirmationEmail(newEmail, otp);
+            log.error("ActionLog.getUserById.error user not found with id {}", id);
+            return new ResourceNotFoundException("USER_NOT_FOUND");
+        });
+        UserEntity userEntity = UserMapper.INSTANCE.updateMember(user, memberUpdateDto);
+        userEntity.setNotCompletedFields(0);
+        String[] fields = memberUpdateDto.toString().split(",");
+        for (String field : fields) {
+            if (field.contains("null")) {
+                userEntity.setNotCompletedFields(userEntity.getNotCompletedFields() + 1);
+            }
         }
         userRepository.save(userEntity);
 
+    }
+
+    public void deleteUser(Long id) {
+        log.info("ActionLog.delete.start id {}", id);
+        if (!userRepository.existsById(id)) {
+            throw new EntityNotFoundException("User not found with " + id);
+        }
+        userRepository.deleteById(id);
+        log.info("ActionLog.delete.end id {}", id);
     }
 
 }

@@ -10,8 +10,11 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @Data
 public class EventDto {
+    private Long id;
     private String title;
     private LocalDate date;
     private String country;
     private String link;
+    private String imageId;
+    private boolean saved;
 }

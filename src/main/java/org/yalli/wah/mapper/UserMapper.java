@@ -3,23 +3,23 @@ package org.yalli.wah.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.factory.Mappers;
-import org.springframework.security.core.userdetails.User;
 import org.yalli.wah.dao.entity.UserEntity;
 import org.yalli.wah.model.dto.MemberDto;
 import org.yalli.wah.model.dto.MemberInfoDto;
+import org.yalli.wah.model.dto.MemberUpdateDto;
 import org.yalli.wah.model.dto.RegisterDto;
 
-@Mapper(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE )
-public abstract class  UserMapper {
+@Mapper
+public abstract class UserMapper {
     public static final UserMapper INSTANCE = Mappers.getMapper(UserMapper.class);
+
     @Mapping(target = "socialMediaAccounts", source = "socialMediaLinks")
     @Mapping(target = "accessToken", ignore = true)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    public abstract UserEntity mapRegisterDtoToUser(RegisterDto registerDto);
+    public abstract UserEntity mapRegisterDtoToUser(RegisterDto registerDto, @MappingTarget UserEntity userEntity);
 
 
     @Mapping(source = "profilePictureUrl", target = "profilePicture")
@@ -27,10 +27,10 @@ public abstract class  UserMapper {
     public abstract MemberDto mapUserEntityToMemberDto(UserEntity userEntity);
 
 
-//    @Mapping(target = "id", ignore = true)
+    //    @Mapping(target = "id", ignore = true)
 //    @Mapping(target = "updatedAt", ignore = true)
     public abstract MemberInfoDto mapUserEntityToMemberInfoDto(UserEntity userEntity);
 
 
-    public abstract UserEntity updateMember(@MappingTarget UserEntity userEntity, MemberInfoDto memberInfoDto);
+    public abstract UserEntity updateMember(@MappingTarget UserEntity userEntity, MemberUpdateDto memberInfoDto);
 }

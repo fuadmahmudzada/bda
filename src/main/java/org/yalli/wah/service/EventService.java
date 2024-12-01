@@ -16,6 +16,7 @@ import org.yalli.wah.dao.repository.UserRepository;
 import org.yalli.wah.mapper.EventMapper;
 import org.yalli.wah.model.dto.EventDetailDto;
 import org.yalli.wah.model.dto.EventDto;
+import org.yalli.wah.model.dto.EventSaveDto;
 import org.yalli.wah.model.dto.EventSearchRequest;
 import org.yalli.wah.model.enums.EventCategory;
 import org.yalli.wah.model.exception.ResourceNotFoundException;
@@ -33,9 +34,12 @@ public class EventService {
     private final UserRepository userRepository;
 
     public Page<EventDto> getAllEvents(EventSearchRequest eventSearchRequest, Pageable pageable, String token) {
-
-        UserEntity userEntity = userRepository.findByAccessToken(token).orElse(null);
-
+        UserEntity userEntity;
+        if (token != null) {
+            userEntity = userRepository.findByAccessToken(token).orElse(null);
+        } else {
+            userEntity = null;
+        }
         Specification<EventEntity> spec = Specification.where((root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -70,7 +74,7 @@ public class EventService {
 
 
             if (eventSearchRequest.getTitle() != null && !eventSearchRequest.getTitle().isEmpty()) {
-                predicates.add(criteriaBuilder.like(root.get("title"), "%" + eventSearchRequest.getTitle() + "%"));
+                predicates.add(criteriaBuilder.like(root.get("title"), eventSearchRequest.getTitle() + "%"));
             }
 
 
@@ -83,14 +87,54 @@ public class EventService {
         });
 
 
-        return eventRepository.findAll(spec, pageable).map(EventMapper.INSTANCE::mapEntityToDto);
+        return eventRepository.findAll(spec, pageable).map(it -> EventMapper.INSTANCE.mapEntityToDto(it,
+                userEntity == null ? null : userEntity.getId()));
     }
-public EventDetailDto getEventById(Long id) {
-    return EventMapper.INSTANCE.manEntityToEventDetailDto(eventRepository.findById(id).orElseThrow(() ->
-    {
-        log.error("ActionLog.getEventById.error event not found with id {}", id);
-        return new ResourceNotFoundException("EVENT_NOT_FOUND");
-    }));
-}
+
+    public EventDetailDto getEventById(Long id) {
+        return EventMapper.INSTANCE.manEntityToEventDetailDto(eventRepository.findById(id).orElseThrow(() ->
+        {
+            log.error("ActionLog.getEventById.error event not found with id {}", id);
+            return new ResourceNotFoundException("EVENT_NOT_FOUND");
+        }));
+    }
+
+    public void saveEvent(EventSaveDto eventSaveDto) {
+        EventEntity eventEntity = eventRepository.findById(eventSaveDto.getId()).orElseThrow(() ->
+        {
+            log.error("ActionLog.findById.error event not found with id {}", eventSaveDto.getId());
+            return new ResourceNotFoundException("Event_NOT_FOUND");
+        });
+        UserEntity userEntity = userRepository.findById(eventSaveDto.getUserId()).orElseThrow(() -> {
+            log.error("ActionLog.findById.error user not found with id {}", eventSaveDto.getUserId());
+            return new ResourceNotFoundException("USER_NOT_FOUND");
+        });
+        List<EventEntity> userEvents = userEntity.getSavedEvents();
+        userEvents.add(eventEntity);
+        userEntity.setSavedEvents(userEvents);
+        userRepository.save(userEntity);
+
+    }
+
+    public void unsaveEvent(EventSaveDto eventSaveDto) {
+        EventEntity eventEntity = eventRepository.findById(eventSaveDto.getId()).orElseThrow(() ->
+        {
+            log.error("ActionLog.findById.error event not found with id {}", eventSaveDto.getId());
+            return new ResourceNotFoundException("EVENT_NOT_FOUND");
+        });
+        UserEntity userEntity = userRepository.findById(eventSaveDto.getUserId()).orElseThrow(() ->
+        {
+            log.error("ActionLog.findById.error user not found with id {}", eventSaveDto.getUserId());
+            return new ResourceNotFoundException("USER_NOT_FOUND");
+        });
+        List<EventEntity> savedEntities = userEntity.getSavedEvents();
+        savedEntities.remove(eventEntity);
+        userEntity.setSavedEvents(savedEntities);
+        userRepository.save(userEntity);
+    }
+
+    public void addEvent(EventDetailDto eventDetailDto) {
+        eventRepository.save(EventMapper.INSTANCE.mapDtoToEntity(eventDetailDto));
+    }
 }
 
