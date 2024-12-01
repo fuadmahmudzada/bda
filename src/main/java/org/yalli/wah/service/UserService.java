@@ -6,20 +6,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import org.yalli.wah.dao.entity.UserEntity;
 import org.yalli.wah.dao.repository.UserRepository;
 import org.yalli.wah.mapper.ProfileMapper;
 import org.yalli.wah.mapper.UserMapper;
-import org.yalli.wah.model.dto.ConfirmDto;
-import org.yalli.wah.model.dto.LoginDto;
-import org.yalli.wah.model.dto.MemberDto;
-import org.yalli.wah.model.dto.MemberInfoDto;
-import org.yalli.wah.model.dto.MemberUpdateDto;
-import org.yalli.wah.model.dto.PasswordResetDto;
-import org.yalli.wah.model.dto.RegisterDto;
-import org.yalli.wah.model.dto.RequestResetDto;
+import org.yalli.wah.model.dto.*;
 import org.yalli.wah.model.exception.InvalidInputException;
 import org.yalli.wah.model.exception.InvalidOtpException;
 import org.yalli.wah.model.exception.PermissionException;
@@ -28,14 +20,15 @@ import org.yalli.wah.util.PasswordUtil;
 import org.yalli.wah.util.TokenUtil;
 import org.yalli.wah.util.UserSpecification;
 
-import java.text.MessageFormat;
+import javax.swing.*;
 import java.time.LocalDateTime;
 
 import java.util.HashMap;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 
 import java.util.*;
-import static org.yalli.wah.model.enums.EmailTemplate.*;
 
 
 
@@ -89,25 +82,28 @@ public class UserService {
         var userEntity = getUserByEmail(email);
         var otp = generateOtp();
         userEntity.setOtp(otp);
-        emailService.sendMail(email, RESET_PASSWORD.getSubject(), formatMessage(RESET_PASSWORD.getBody(), otp));
+        emailService.sendOtp(email, otp);
         userRepository.save(userEntity);
         log.info("ActionLog.sendOtp.end email {}", email);
     }
 
     public void register(RegisterDto registerDto) {
         log.info("ActionLog.register.start email {}", registerDto.getEmail());
-        UserEntity userEntity = userRepository.findByEmail(registerDto.getEmail()).map((user) -> {
+        userRepository.findByEmail(registerDto.getEmail()).ifPresent((user) -> {
             if (user.isEmailConfirmed()) {
                 throw new InvalidInputException("EMAIL_ALREADY_EXISTS");
             }
-            return user;
-        }).orElse(new UserEntity());
+        });
+        UserEntity userEntity = userRepository.findByEmail(registerDto.getEmail()).orElse(new UserEntity());
         userEntity = UserMapper.INSTANCE.mapRegisterDtoToUser(registerDto, userEntity);
         userEntity.setPassword(passwordUtil.encode(userEntity.getPassword()));
 
 
         //send otp
-        processOtp(userEntity);
+        String otp = generateOtp();
+        userEntity.setOtp(otp);
+        userEntity.setOtpExpiration(LocalDateTime.now().plusSeconds(60));
+        emailService.sendConfirmationEmail(registerDto.getEmail(), otp);
 
         userRepository.save(userEntity);
         log.info("ActionLog.register.end email {}", registerDto.getEmail());
@@ -146,7 +142,7 @@ public class UserService {
         user.setOtpExpiration(LocalDateTime.now().plusMinutes(1));
         userRepository.save(user);
 
-        emailService.sendMail(user.getEmail(), RESET_PASSWORD.getSubject(), formatMessage(RESET_PASSWORD.getBody(), otp));
+        emailService.sendOtp(user.getEmail(), otp);
         log.info("ActionLog.requestPasswordReset.success OTP sent email {}", requestResetDto.getEmail());
     }
 
@@ -264,35 +260,13 @@ public class UserService {
 
     }
 
-    public void deleteUser(Long id){
+    public void deleteUser(Long id) {
         log.info("ActionLog.delete.start id {}", id);
-        if(!userRepository.existsById(id)){
+        if (!userRepository.existsById(id)) {
             throw new EntityNotFoundException("User not found with " + id);
         }
         userRepository.deleteById(id);
         log.info("ActionLog.delete.end id {}", id);
-    }
-
-    public void processOtp(UserEntity userEntity){
-        log.info("ActionLog.sendRegisterOtp.start email {}", userEntity.getEmail());
-        String firstOtp = userEntity.getOtp();
-        String otp = generateOtp();
-        userEntity.setOtp(otp);
-        userEntity.setOtpExpiration(LocalDateTime.now().plusSeconds(60));
-        emailService.sendMail(userEntity.getEmail(),CONFIRMATION.getSubject(),formatMessage(CONFIRMATION.getBody(),otp));
-        if(firstOtp!=null){
-            userRepository.save(userEntity);
-        }
-        log.info("ActionLog.sendRegisterOtp.end email {}", userEntity.getEmail());
-    }
-
-    public void resendRegisterOtp(String email){
-        UserEntity userEntity = getUserByEmail(email);
-        processOtp(userEntity);
-    }
-
-    private String formatMessage(String message, String... values) {
-        return MessageFormat.format(message, (Object[]) values);
     }
 
 }
