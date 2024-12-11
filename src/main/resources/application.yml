@@ -1,14 +1,14 @@
 spring:
   datasource:
     username: yalli_database_user
-    password: 96wcKHXbang2yV8lmeppDMo7iueFsmK7
+    password: ${DB_PASSWORD}
     url: ${DB_URL}
   jpa:
     hibernate:
       ddl-auto: update
   mail:
     host: smtp.gmail.com
-    username: texnoera.academy@gmail.com
+    username: ${MAIL_EMAIL}
     password: ${MAIL_PASSWORD}
     port: 587
     properties:
